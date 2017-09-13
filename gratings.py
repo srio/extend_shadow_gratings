@@ -1,15 +1,23 @@
 #
 # Python script to run shadow3. Created automatically with ShadowTools.make_python_script_from_list().
 #
+
 import Shadow
 import numpy
 
-import matplotlib.pylab as plt
-plt.switch_backend("Qt5Agg")
+try:
+    import matplotlib.pylab as plt
+    plt.switch_backend("Qt5Agg")
+except:
+    pass
+
+
 from SurfaceConic import SurfaceConic
 
 
-
+#
+# Extension of SHadowBeam with new methods
+#
 class Beam2(Shadow.Beam):
 
     def __init__(self):
@@ -71,13 +79,7 @@ class Beam2(Shadow.Beam):
 
 
 
-
-
-
-
-
-
-    def traceGrating(self,oe,number,newcode=True): 
+    def traceVLSGrating(self,oe,number,newcode=True):
         if not newcode:
             return self.traceOE(oe,number)
 
@@ -90,15 +92,15 @@ class Beam2(Shadow.Beam):
         q             = oe.T_IMAGE  # 300.0        # mirror-image
         alpha         = oe.ALPHA    # 0.0      # mirror orientation angle
         theta_grazing = (90.0-oe.T_INCIDENCE) * numpy.pi / 180  # 5e-3     # grazing angle, rad
-        fcyl          = oe1.FCYL
-        f_convex      = oe1.F_CONVEX
+        fcyl          = oe.FCYL
+        f_convex      = oe.F_CONVEX
    
         print("fmirr = %s, p=%f, q=%f, alpha=%f, theta_grazing=%f rad, fcyl=%d"%\
               (fmirr,p,q,alpha,theta_grazing,fcyl))
 
         if fmirr == 2:
-            ccc = SurfaceConic.initialize_as_ellipsoid_from_focal_distances(p,q,theta_grazing,cylindrical=fcyl,switch_convexity=f_convex)
-            print(ccc)
+            ccc = SurfaceConic.initialize_as_ellipsoid_from_focal_distances(4300.,2800.0,theta_grazing,cylindrical=fcyl,switch_convexity=f_convex)
+            print(ccc.info())
         else:
             raise Exception("Not implemented")
 
@@ -107,7 +109,6 @@ class Beam2(Shadow.Beam):
         #
         # put beam in mirror reference system
         #
-        # TODO: calculate rotation matrices? Invert them for putting back to the lab system?
     
         self.rotate(alpha,axis=2)
         self.rotate(theta_grazing,axis=1)
@@ -115,34 +116,22 @@ class Beam2(Shadow.Beam):
     
     
         #
-        # reflect beam in the mirror surface and dump mirr.01
+        # reflect beam in the mirror/grating surface and dump mirr.01
         #
-        self = ccc.apply_specular_reflection_on_beam(self)
-        #self.dump_shadow3_file('minimirr.02')
+        self = ccc.apply_grating_vls_on_beam(self,oe.RULING, oe.RUL_A1, oe.RUL_A2)
+        self.write('mirr.02')
     
         #
         # put beam in lab frame and compute image
         #
-        #self.rotate(theta_grazing,axis=1)
+        self.rotate(theta_grazing,axis=1)
         # TODO what about alpha?
-        #self.retrace(q,resetY=True)
-        #self.dump_shadow3_file('ministar.02')
+        self.retrace(q)
+        self.rays[:,1] = 0.0 # resetY
+        self.write('star.02')
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-        return self.traceOE(oe,number)
+        return self
     
 
 	
@@ -252,7 +241,7 @@ if __name__ == "__main__":
 
     ##<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
     #beam.traceOE(oe2,2)
-    beam.traceGrating(oe2,2)
+    beam.traceVLSGrating(oe2,2)
     ##<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
     if iwrite:
         oe2.write("end.02")
